@@ -1,0 +1,149 @@
+package wantlist
+
+import (
+	"testing"
+
+	pb "github.com/ipfs/go-bitswap/message/pb"
+	cid "github.com/ipfs/go-cid"
+)
+
+var testcids []cid.Cid
+
+func init() {
+	strs := []string{
+		"QmQL8LqkEgYXaDHdNYCG2mmpow7Sp8Z8Kt3QS688vyBeC7",
+		"QmcBDsdjgSXU7BP4A4V8LJCXENE5xVwnhrhRGVTJr9YCVj",
+		"QmQakgd2wDxc3uUF4orGdEm28zUT9Mmimp5pyPG2SFS9Gj",
+	}
+	for _, s := range strs {
+		c, err := cid.Decode(s)
+		if err != nil {
+			panic(err)
+		}
+		testcids = append(testcids, c)
+	}
+
+}
+
+type wli interface {
+	Contains(cid.Cid) (Entry, bool)
+}
+
+func assertHasCid(t *testing.T, w wli, c cid.Cid) {
+	e, ok := w.Contains(c)
+	if !ok {
+		t.Fatal("expected to have ", c)
+	}
+	if !e.Cid.Equals(c) {
+		t.Fatal("returned entry had wrong cid value")
+	}
+}
+
+func TestBasicWantlist(t *testing.T) {
+	wl := New()
+
+	if !wl.Add(testcids[0], 5, pb.Message_Wantlist_Block) {
+		t.Fatal("expected true")
+	}
+	assertHasCid(t, wl, testcids[0])
+	if !wl.Add(testcids[1], 4, pb.Message_Wantlist_Block) {
+		t.Fatal("expected true")
+	}
+	assertHasCid(t, wl, testcids[0])
+	assertHasCid(t, wl, testcids[1])
+
+	if wl.Len() != 2 {
+		t.Fatal("should have had two items")
+	}
+
+	if wl.Add(testcids[1], 4, pb.Message_Wantlist_Block) {
+		t.Fatal("add shouldnt report success on second add")
+	}
+	assertHasCid(t, wl, testcids[0])
+	assertHasCid(t, wl, testcids[1])
+
+	if wl.Len() != 2 {
+		t.Fatal("should have had two items")
+	}
+
+	if !wl.Remove(testcids[0], pb.Message_Wantlist_Block) {
+		t.Fatal("should have gotten true")
+	}
+
+	assertHasCid(t, wl, testcids[1])
+	if _, has := wl.Contains(testcids[0]); has {
+		t.Fatal("shouldnt have this cid")
+	}
+}
+
+func TestAddHaveThenBlock(t *testing.T) {
+	wl := New()
+
+	wl.Add(testcids[0], 5, pb.Message_Wantlist_Have)
+	wl.Add(testcids[0], 5, pb.Message_Wantlist_Block)
+
+	e, ok := wl.Contains(testcids[0])
+	if !ok {
+		t.Fatal("expected to have ", testcids[0])
+	}
+	if e.WantType != pb.Message_Wantlist_Block {
+		t.Fatal("expected to be ", pb.Message_Wantlist_Block)
+	}
+}
+
+func TestAddBlockThenHave(t *testing.T) {
+	wl := New()
+
+	wl.Add(testcids[0], 5, pb.Message_Wantlist_Block)
+	wl.Add(testcids[0], 5, pb.Message_Wantlist_Have)
+
+	e, ok := wl.Contains(testcids[0])
+	if !ok {
+		t.Fatal("expected to have ", testcids[0])
+	}
+	if e.WantType != pb.Message_Wantlist_Block {
+		t.Fatal("expected to be ", pb.Message_Wantlist_Block)
+	}
+}
+
+func TestAddHaveThenRemoveBlock(t *testing.T) {
+	wl := New()
+
+	wl.Add(testcids[0], 5, pb.Message_Wantlist_Have)
+	wl.Remove(testcids[0], pb.Message_Wantlist_Block)
+
+	_, ok := wl.Contains(testcids[0])
+	if ok {
+		t.Fatal("expected not to have ", testcids[0])
+	}
+}
+
+func TestAddBlockThenRemoveHave(t *testing.T) {
+	wl := New()
+
+	wl.Add(testcids[0], 5, pb.Message_Wantlist_Block)
+	wl.Remove(testcids[0], pb.Message_Wantlist_Have)
+
+	e, ok := wl.Contains(testcids[0])
+	if !ok {
+		t.Fatal("expected to have ", testcids[0])
+	}
+	if e.WantType != pb.Message_Wantlist_Block {
+		t.Fatal("expected to be ", pb.Message_Wantlist_Block)
+	}
+}
+
+func TestSortedEntries(t *testing.T) {
+	wl := New()
+
+	wl.Add(testcids[0], 3, pb.Message_Wantlist_Block)
+	wl.Add(testcids[1], 5, pb.Message_Wantlist_Have)
+	wl.Add(testcids[2], 4, pb.Message_Wantlist_Have)
+
+	entries := wl.SortedEntries()
+	if !entries[0].Cid.Equals(testcids[1]) ||
+		!entries[1].Cid.Equals(testcids[2]) ||
+		!entries[2].Cid.Equals(testcids[0]) {
+		t.Fatal("wrong order")
+	}
+}
