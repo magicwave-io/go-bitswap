@@ -1,0 +1,3 @@
+package bitswap_message_pb
+
+type IsMessage_PaymentMessage isMessage_PaymentMessage
