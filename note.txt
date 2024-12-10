@@ -1,0 +1,28 @@
+
+func  InitiatePayment(paymentRequest string) paymentmanager.PaymentData {
+	m.initiatePayment = paymentRequest
+}
+
+func  PaymentCommand(commandId string, commandBody []byte, commandType models.CommandType, sessionId string) paymentmanager.PaymentData {
+	m.paymentCommand = &PaymentCommand{
+		commandId,
+		commandBody,
+		commandType,
+		sessionId,
+	}
+}
+
+func  PaymentResponse(commandId string, commandReply []byte, sessionId string) paymentmanager.PaymentData {
+	m.paymentResponse = &PaymentResponse{
+		commandId,
+		commandReply,
+		sessionId,
+	}
+}
+
+func  PaymentStatusResponse(sessionId string, status bool) paymentmanager.PaymentData {
+	m.paymentStatusResponse = &PaymentStatusResponse{
+		sessionId,
+		status,
+	}
+}
